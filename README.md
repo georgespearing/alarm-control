@@ -1,58 +1,51 @@
-# alarm-control
-building an alarm clock around STM32F103
+# Alarm Project
 
-## Planned features: 
+Code base for Custom Alarm 
 
-- Clock display (LCD)
-  - Backlight brightness toggle option
-- Led Strip Light gradual turn on (or relay to power lamp)
-- Buzzer with 2 different mode settings
-- Power cord or batter backup.
-	- Battery Shall power clock for >= 72 hours
+## Features
 
-- Modes: 
-    - LED strip
-    - Relay (120v outlet)
-    - Buzzer
+1. Display for Time
+    - Time in hour and minute. Default 24h. 
+    - Indicator for Alarm Active (Sound On)
+    - Indicator for Light Active (Alarm Must be active)
 
-## I/O
+2. Buttons for the following
+    - Time Set
+    - Alarm (Set Time)
+    - Hour
+    - Minute
+    - Alarm / Light (Whether to have a light to come on)
+    - Snooze (buzzer only if light is on)
 
-- 6 Buttons
-	- 1 alarm on/off toggle, press & hold to set time
-	- Hour Increment
-	- Minute Increment
-	- Backlight settting 
-	- Feature settting toggle (ext. light, buzzer, both)
-	- 12/24 hour switch
-- Power Cord
-- Battery
-- Clock
-- Backlight (clock brightness)
-- Plug for 12v light source (to turn on with alarm)
+3. Buzzer for Alarm 
 
-## Power Supplies
+4. Light (12V LED strip)
 
-- On Battery Power
-	- Disable 12V light output
-	- Dim clock to lowest setting
+5. Battery Backup
+    - Reach Goal. Two phases. First phase is just to keep current time and alarm time if main power is removed. Second phase is full operation (light optional) 
 
-- On Plug Power
-	- Allow user settings
-	- Charge Battery
- 
-- Power Requirements
-	- Minimum: 
-	- Maximum: 
-	
-	- STM32 Average: 
-	- Lights: 
-	- Buzzer: 
+## Hardware
 
-## Functions (code outline)
+- ESP32
+- 12V LED strip (DC Jack)
+- 12V input (DC Jack)
 
-- All Buttons have interrupts
-	- time / feature setting only active if alarm button was press & held
+## Code 
 
-- callback for buzzer
-- Timer for clock function
-- Something to check wall power vs battery power
+- If the Time Set button is held, blink the screen
+    - As hour is pressed, increase display
+    - As minute is pressed, increase display
+
+- If the Alarm set button is held, blink the screen
+    - As hour is pressed, increase display
+    - As minute is pressed, increase display
+
+- If the Alarm / Light button is pressed, 
+    - one press turns on alarm
+    - two press adds light option
+    - three press turns off
+
+- If the Snooze button is pressed (only valid if alarm is actively triggered)
+    - If light is on, keep light on
+    - Alarm buzzer should turn off for 8 minutes
+    

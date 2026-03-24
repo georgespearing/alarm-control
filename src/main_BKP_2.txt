@@ -1,0 +1,234 @@
+/*********
+  Rui Santos
+  Complete project details at https://randomnerdtutorials.com  
+*********/
+
+#include <Arduino.h>
+#include "RTClib.h"
+
+RTC_DS1307 rtc;
+
+char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
+int alarm_hr = 7;
+int alarm_min = 16;
+int alarm_sec = 7;
+int light_status = 0;
+int light_dim_value = 0;
+
+int alarm_active = 1;
+int alarm_trigger = 0;
+int last_button_trigger = 0;
+int button_trigger = 0;
+
+TaskHandle_t Task1;
+TaskHandle_t Task2;
+
+// LED pins
+const int led1 = 16;
+const int button1 = 19;
+
+unsigned long button_time = 0;  
+unsigned long last_button_time = 0; 
+
+// pin for RTC interrupt
+const int rtc_int = 23;
+
+struct Alarm {
+  bool active;
+  bool trigger;
+  DateTime alarm_time;
+  uint16_t year;
+  uint8_t month;
+  uint8_t day;
+  uint8_t hour;
+  uint8_t min;
+  uint8_t sec;
+
+};
+
+DateTime startup_time;
+DateTime now;
+Alarm alarm1;
+
+
+
+
+//Task1code: blinks an LED every 1000 ms
+void Task1code( void * pvParameters ){
+  // Serial.print("Task1 running on core ");
+  // Serial.println(xPortGetCoreID());
+
+  
+
+  for(;;){
+    Serial.println("TASK1");
+    // Get the current time from the RTC
+    now = rtc.now();
+
+    
+    
+    
+    // Getting each time field in individual variables
+    // And adding a leading zero when needed;
+    String yearStr = String(now.year(), DEC);
+    String monthStr = (now.month() < 10 ? "0" : "") + String(now.month(), DEC);
+    String dayStr = (now.day() < 10 ? "0" : "") + String(now.day(), DEC);
+    String hourStr = (now.hour() < 10 ? "0" : "") + String(now.hour(), DEC); 
+    String minuteStr = (now.minute() < 10 ? "0" : "") + String(now.minute(), DEC);
+    String secondStr = (now.second() < 10 ? "0" : "") + String(now.second(), DEC);
+    String dayOfWeek = daysOfTheWeek[now.dayOfTheWeek()];
+
+    // Complete time string
+    String formattedTime = dayOfWeek + ", " + yearStr + "-" + monthStr + "-" + dayStr + " " + hourStr + ":" + minuteStr + ":" + secondStr;
+
+    // Print the complete formatted time
+    Serial.println(formattedTime);
+
+    // Serial.println();
+    // digitalWrite(led1, HIGH);
+    // delay(1000);
+    // digitalWrite(led1, LOW);
+
+    if (alarm1.active & !alarm1.trigger){
+      if (now.second() == alarm1.sec){
+        Serial.print("ALARM!");
+        while (light_dim_value < 240){
+          analogWrite(led1, light_dim_value);
+          light_dim_value += 10;
+          delay(250);
+        }
+        alarm1.trigger = false;
+      }
+        
+        // if (now.minute() != alarm_min ){
+        //   alarm_trigger = 0;
+        // }
+      }
+    
+
+
+
+    
+    delay(250);
+  } 
+}
+
+//Task2code: blinks an LED every 700 ms
+void Task2code( void * pvParameters ){
+  Serial.print("Task2 running on core ");
+  Serial.println(xPortGetCoreID());
+
+  
+
+
+  for(;;){
+    Serial.println("TASK2");
+
+    // if (alarm_active){
+    //   if (!last_button_trigger){
+    //     if (now.second() == alarm_sec){
+    //       alarm_trigger = 1;
+    //     }
+    //     if (digitalRead(button1)){
+    //       alarm_trigger = 0;
+    //       last_button_trigger = 1;
+    //       light_dim_value = 0;
+    //       analogWrite(led1, light_dim_value);
+    //     }
+    //     // if (now.minute() != alarm_min ){
+    //     //   alarm_trigger = 0;
+    //     // }
+    //   }
+      
+    // }
+
+    // if (last_button_trigger){
+    //   if (now.second() != alarm_sec){
+    //     last_button_trigger = 0;
+    //   }
+    // }
+
+
+
+  //   delay(50);
+  }
+}
+
+void IRAM_ATTR isr() {
+
+  button_time = millis();
+  if (button_time - last_button_time > 250){
+    Serial.println("INTERRUPT");
+    analogWrite(led1, 0);
+
+    last_button_time = button_time;
+  } 
+  
+}
+
+void setup() {
+  Serial.begin(115200); 
+  delay(500);
+  Serial.println("hello");
+  
+  // pinMode(led1, OUTPUT);
+  pinMode(button1, INPUT);
+  pinMode(rtc_int, INPUT_PULLUP);
+
+  
+
+  if (! rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    Serial.flush();
+    while (1) delay(10);
+  }
+
+  rtc.writeSqwPinMode (DS1307_SquareWave1HZ);
+  //attachInterrupt(alarm_trigger, isr, RISING);
+  attachInterrupt(digitalPinToInterrupt(button1), isr, FALLING);
+
+
+  Serial.println("let's set the time!");
+  // When time needs to be set on a new device, or after a power loss, the
+  // following line sets the RTC to the date & time this sketch was compiled
+  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  // This line sets the RTC with an explicit date & time, for example to set
+  // January 21, 2014 at 3am you would call:
+  // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+  
+  startup_time = rtc.now();
+  alarm1.alarm_time = startup_time;
+  alarm1.sec = alarm1.alarm_time.second() + 20;
+  alarm1.active = true;
+  alarm1.trigger = false;
+
+  //create a task that will be executed in the Task1code() function, with priority 1 and executed on core 0
+  xTaskCreatePinnedToCore(
+                    Task1code,   /* Task function. */
+                    "Task1",     /* name of task. */
+                    10000,       /* Stack size of task */
+                    NULL,        /* parameter of the task */
+                    1,           /* priority of the task */
+                    &Task1,      /* Task handle to keep track of created task */
+                    0);          /* pin task to core 0 */                  
+  delay(500); 
+
+  //create a task that will be executed in the Task2code() function, with priority 1 and executed on core 1
+  // xTaskCreatePinnedToCore(
+  //                   Task2code,   /* Task function. */
+  //                   "Task2",     /* name of task. */
+  //                   10000,       /* Stack size of task */
+  //                   NULL,        /* parameter of the task */
+  //                   1,           /* priority of the task */
+  //                   &Task2,      /* Task handle to keep track of created task */
+  //                   1);          /* pin task to core 1 */
+  //   delay(500); 
+}
+
+
+
+void loop() {
+  
+}
+
